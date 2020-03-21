@@ -48,7 +48,7 @@ if args.flag is None and args.login is None and args.inclusion is None:
     print(f'Nothing to do...\nSeek not and ye shall find not\n\nUse the -h flag for help')
     sys.exit(0)
 
-forms = utils.find_forms(args.target)
+forms = utils.find_forms(args.target) + utils.find_formlike(args.target, args.delay)
 results = []
 
 if args.login is not None:

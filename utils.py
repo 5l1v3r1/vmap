@@ -1,12 +1,13 @@
-import bs4, requests, typing
+import bs4, requests, re, time, typing
 
 '''
 Represents a HTML form
 '''
 class Form():
-    def __init__(self, url: str, method: str) -> None:
+    def __init__(self, url: str, method: str, ftype: str = 'form') -> None:
         self._url = url
         self._method = method
+        self._type = ftype
         self._fields = []
 
     def add_field(self, name: str) -> None:
@@ -19,7 +20,7 @@ class Form():
         return soupify(self._url, self._method, values, cookie)
 
     def __repr__(self) -> str:
-        return f'{self._method} {self._url} (' + ', '.join(self._fields) + ')'
+        return f'{self._type} {self._method} {self._url} (' + ', '.join(self._fields) + ')'
 
 SoupifyResult = typing.Union[typing.Tuple[None, int, None], typing.Tuple[bs4.BeautifulSoup, None, typing.Optional[str]]]
 
@@ -64,3 +65,55 @@ def find_forms(url: str) -> typing.List[Form]:
         forms.append(form_obj)
     
     return forms
+
+'''
+Find all form-like URLs by crawling
+'''
+def find_formlike(url: str, delay: typing.Optional[int]) -> typing.List[Form]:
+    visited = set()
+    queue = []
+
+    queue.append(url)
+
+    while len(queue) > 0:
+        this_url = queue.pop()
+
+        visited.add(this_url)
+        page, err, _ = soupify(this_url)
+
+        if err:
+            continue
+        
+        for link in page.find_all('a'):
+            next_url = link.get('href')
+
+            if next_url.startswith('/'):
+                next_url = url + next_url[1:]
+
+            if next_url is not None and next_url not in visited:
+                queue.append(next_url)
+        
+        if delay is not None:
+            time.sleep(delay)
+    
+    form_unique = set()
+
+    for candidate in visited:
+        if '?' in candidate:
+            candidate = re.sub(r'=[^&]+&', '&', candidate)
+            candidate = re.sub(r'=[^&]+', '', candidate)
+            form_unique.add(candidate)
+
+    results = []
+
+    for candidate in form_unique:
+        parts = candidate.split('?')
+        form = Form(parts[0], 'GET', 'form-like URL')
+
+        pairs = parts[1].split('&')
+        for pair in pairs:
+            form.add_field(pair)
+        
+        results.append(form)
+    
+    return results

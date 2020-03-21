@@ -12,7 +12,7 @@ class LFIVuln():
         self._field = field
     
     def __repr__(self) -> str:
-        return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in form for {self._form}\nLFI using {self._value}'
+        return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in {self._form}\nLFI using {self._value}'
 
 '''
 Generates paths to try

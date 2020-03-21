@@ -13,7 +13,7 @@ class SQLIVuln():
         self._field = field
     
     def __repr__(self) -> str:
-        return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in form for {self._form}\nQuery was {self._query}, type {self._qtype}'
+        return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in {self._form}\nQuery was {self._query}, type {self._qtype}'
 
 '''
 Avoids a blacklist by adding substrings for query words
