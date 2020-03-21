@@ -44,7 +44,7 @@ def soupify(url: str, method: str = 'GET', payload: typing.Dict[str, str] = {}, 
 '''
 Find and return all HTML forms on a page
 '''
-def find_forms(url: str) -> typing.List[Form]:
+def find_forms(url: str, match_url: typing.Optional[str], exclude_url: typing.Optional[str]) -> typing.List[Form]:
     page, err, _ = soupify(url)
 
     if err is not None:
@@ -54,6 +54,12 @@ def find_forms(url: str) -> typing.List[Form]:
     base = url.split('/')[0] + '//' + url.split('/')[2]
 
     for form in page.find_all('form'):
+        if match_url is not None and not re.search(match_url, base + form.get('action')):
+            continue
+
+        if exclude_url is not None and re.search(exclude_url, base + form.get('action')):
+            continue
+
         form_obj = Form(base + form.get('action') if form.get('action')[0] == '/' else form.get('action'), form.get('method', 'GET'))
 
         for field in form.find_all('input'):
@@ -69,7 +75,7 @@ def find_forms(url: str) -> typing.List[Form]:
 '''
 Find all form-like URLs by crawling
 '''
-def find_formlike(url: str, delay: typing.Optional[int]) -> typing.List[Form]:
+def find_formlike(url: str, match_url: typing.Optional[str], exclude_url: typing.Optional[str], delay: typing.Optional[int]) -> typing.List[Form]:
     visited = set()
     queue = []
 
@@ -89,6 +95,12 @@ def find_formlike(url: str, delay: typing.Optional[int]) -> typing.List[Form]:
 
             if next_url.startswith('/'):
                 next_url = url + next_url[1:]
+            
+            if match_url is not None and not re.search(match_url, next_url):
+                continue
+
+            if exclude_url is not None and re.search(exclude_url, next_url):
+                continue
 
             if next_url is not None and next_url not in visited:
                 queue.append(next_url)

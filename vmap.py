@@ -40,6 +40,8 @@ parser.add_argument('-f', '--flag', metavar=('flag', 'column', 'table'), nargs=3
 parser.add_argument('-i', '--inclusion', metavar=('file', 'flag'), nargs=2, help='test for local file inclusion with the given path, file should contain the given flag')
 parser.add_argument('--limit', metavar='limit', default=4, type=int, help='generalised limit for how deep searches should be (defaults to 4)')
 parser.add_argument('--delay', metavar='delay', type=int, help='specify a delay between requests to avoid overloading the server')
+parser.add_argument('--match-url', metavar='pattern', type=str, help='specify a regular expression which URLs must match to be considered for vulnerabilites')
+parser.add_argument('--exclude-url', metavar='pattern', type=str, help='specify a regular expression for which matching URLs are not considered for vulnerabilities')
 parser.add_argument('target', type=str, help='the target URL')
 
 args = parser.parse_args()
@@ -48,7 +50,7 @@ if args.flag is None and args.login is None and args.inclusion is None:
     print(f'Nothing to do...\nSeek not and ye shall find not\n\nUse the -h flag for help')
     sys.exit(0)
 
-forms = utils.find_forms(args.target) + utils.find_formlike(args.target, args.delay)
+forms = utils.find_forms(args.target, args.match_url, args.exclude_url) + utils.find_formlike(args.target, args.match_url, args.exclude_url, args.delay)
 results = []
 
 if args.login is not None:
