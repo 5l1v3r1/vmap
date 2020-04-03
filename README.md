@@ -12,10 +12,10 @@ pip3 install -r requirements.txt
 chmod u+x vmap.py
 ```
 
-The easiest way to use VMAP is with the [PhantomJS](https://phantomjs.org/) headless browser, which can be installed on Ubuntu like so:
+Testing for XSS also requires Google Chrom(e|ium), and the associated Selenium web driver:
 
 ```sh
-sudo apt install phantomjs
+sudo apt install chromium-chromedriver
 ```
 
 ## Running

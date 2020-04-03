@@ -21,7 +21,7 @@ class SQLIVuln():
             'field' : self._field,
             'query' : self._query,
             'query_type' : self._qtype,
-            'type' : 'LFI'
+            'type' : 'SQLI'
         }
     
     def __repr__(self) -> str:

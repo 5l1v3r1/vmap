@@ -2,7 +2,7 @@
 
 import argparse, json, re, sys
 
-import lfi, sqli, utils
+import lfi, sqli, utils, xss
 
 # Legally required cool hacker ASCII art
 art = '''\x1B[94m
@@ -38,6 +38,7 @@ parser = argparse.ArgumentParser(description='VMAP Web Vulnerability Tester, wri
 parser.add_argument('-l', '--login', metavar='cookie', help='test login queries, checking for the existence of a given cookie')
 parser.add_argument('-f', '--flag', metavar=('flag', 'column', 'table'), nargs=3, help='test sql flag queries, checking for injecting a particular value, from a particular column, in a particular table')
 parser.add_argument('-i', '--inclusion', metavar=('file', 'flag'), nargs=2, help='test for local file inclusion with the given path, file should contain the given flag')
+parser.add_argument('-s', '--script', action='store_true', help='check for the ability to run user-supplied scripts')
 parser.add_argument('--limit', metavar='limit', default=4, type=int, help='generalised limit for how deep searches should be (defaults to 4)')
 parser.add_argument('--delay', metavar='delay', type=int, help='specify a delay between requests to avoid overloading the server')
 parser.add_argument('--match-url', metavar='pattern', type=str, help='specify a regular expression which URLs must match to be considered for vulnerabilites')
@@ -47,7 +48,7 @@ parser.add_argument('target', type=str, help='the target URL')
 
 args = parser.parse_args()
 
-if args.flag is None and args.login is None and args.inclusion is None:
+if args.flag is None and args.login is None and args.inclusion is None and args.script is None:
     print(f'Nothing to do...\nSeek not and ye shall find not\n\nUse the -h flag for help')
     sys.exit(0)
 
@@ -79,6 +80,10 @@ if args.flag is not None:
 if args.inclusion is not None:
     print('Checking local file inclusion...')
     results += lfi.test_lfi(forms, args.limit, args.delay, args.inclusion[0], args.inclusion[1])
+
+if args.script is not None:
+    print('Checking script injection...')
+    results += xss.test_scripts(forms, args.limit, args.delay)
 
 print('')
 

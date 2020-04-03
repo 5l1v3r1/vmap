@@ -1,5 +1,8 @@
 import bs4, requests, re, time, typing
 
+SoupifyResult = typing.Union[typing.Tuple[None, int, None], typing.Tuple[bs4.BeautifulSoup, None, typing.Optional[str]]]
+SouplessResult = typing.Union[typing.Tuple[None, int], typing.Tuple[str, None]]
+
 '''
 Represents a HTML form
 '''
@@ -20,13 +23,14 @@ class Form():
     def get_fields(self) -> typing.List[str]:
         return self._fields
 
-    def request(self, values: typing.Dict[str, str], cookie: typing.Optional[str]) -> bs4.BeautifulSoup:
+    def request(self, values: typing.Dict[str, str], cookie: typing.Optional[str]) -> SoupifyResult:
         return soupify(self._url, self._method, values, cookie)
+    
+    def soupless_request(self, values: typing.Dict[str, str]) -> SouplessResult:
+        return soupless(self._url, self._method, values)
 
     def __repr__(self) -> str:
         return f'{self._type} {self._method} {self._url} (' + ', '.join(self._fields) + ')'
-
-SoupifyResult = typing.Union[typing.Tuple[None, int, None], typing.Tuple[bs4.BeautifulSoup, None, typing.Optional[str]]]
 
 '''
 Make a request to a URL and turn it into beautiful soup
@@ -36,14 +40,31 @@ def soupify(url: str, method: str = 'GET', payload: typing.Dict[str, str] = {}, 
 
     if method == 'GET':
         res = s.get(url, params=payload)
-        if res.status_code // 100 == 4 or res.status_code // 100 == 5:
+        if not res.ok:
             return None, res.status_code, None
         return bs4.BeautifulSoup(res.text, 'lxml'), None, s.cookies[cookie] if (cookie is not None and cookie in s.cookies) else None
     elif method == 'POST':
         res = s.post(url, data=payload)
-        if res.status_code // 100 == 4 or res.status_code // 100 == 5:
+        if not res.ok:
             return None, res.status_code, None
         return bs4.BeautifulSoup(res.text, 'lxml'), None, s.cookies[cookie] if (cookie is not None and cookie in s.cookies) else None
+
+'''
+Make a request to a URL and then return the URL for the final page, useful for JS
+'''
+def soupless(url: str, method: str = 'GET', payload: typing.Dict[str, str] = {}) -> SouplessResult:
+    s = requests.Session()
+
+    if method == 'GET':
+        res = s.get(url, params=payload)
+        if not res.ok:
+            return None, res.status_code
+        return res.url, None
+    elif method == 'POST':
+        res = s.post(url, data=payload)
+        if not res.ok:
+            return None, res.status_code
+        return res.url, None
 
 '''
 Scrape a website to find all forms and form-like URLs
@@ -135,6 +156,12 @@ def find_forms(url: str, match_url: typing.Union[str, re.Pattern, None], exclude
 
         for field in form.find_all('input'):
             if field.get('type') not in ['text', 'password', 'search'] or 'name' not in field.attrs:
+                continue
+
+            form_obj.add_field(field.get('name'))
+        
+        for field in form.find_all('textarea'):
+            if 'name' not in field.attrs:
                 continue
 
             form_obj.add_field(field.get('name'))
