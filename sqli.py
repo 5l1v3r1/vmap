@@ -6,11 +6,23 @@ import utils
 Gives information about a vulnerable form field
 '''
 class SQLIVuln():
-    def __init__(self, query: str, qtype:str, form: str, field: str) -> None:
+    def __init__(self, query: str, qtype:str, form: utils.Form, field: str) -> None:
         self._query = query
         self._qtype = qtype
         self._form = form
         self._field = field
+    
+    @property
+    def form(self) -> utils.Form:
+        return self._form
+    
+    def json(self) -> typing.Dict[str, str]:
+        return {
+            'field' : self._field,
+            'query' : self._query,
+            'query_type' : self._qtype,
+            'type' : 'LFI'
+        }
     
     def __repr__(self) -> str:
         return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in {self._form}\nQuery was {self._query}, type {self._qtype}'

@@ -6,11 +6,22 @@ import utils
 Gives information about a vulnerable form field
 '''
 class LFIVuln():
-    def __init__(self, value: str, form: str, field: str) -> None:
+    def __init__(self, value: str, form: utils.Form, field: str) -> None:
         self._value = value
         self._form = form
         self._field = field
     
+    @property
+    def form(self) -> utils.Form:
+        return self._form
+    
+    def json(self) -> typing.Dict[str, str]:
+        return {
+            'field' : self._field,
+            'value' : self._value,
+            'type' : 'LFI'
+        }
+
     def __repr__(self) -> str:
         return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in {self._form}\nLFI using {self._value}'
 

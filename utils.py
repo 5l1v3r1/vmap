@@ -9,6 +9,10 @@ class Form():
         self._method = method
         self._type = ftype
         self._fields = []
+    
+    @property
+    def name(self) -> str:
+        return self._method + ' ' + self._url + ' (' + self._type + ')'
 
     def add_field(self, name: str) -> None:
         self._fields.append(name)
@@ -42,25 +46,92 @@ def soupify(url: str, method: str = 'GET', payload: typing.Dict[str, str] = {}, 
         return bs4.BeautifulSoup(res.text, 'lxml'), None, s.cookies[cookie] if (cookie is not None and cookie in s.cookies) else None
 
 '''
+Scrape a website to find all forms and form-like URLs
+'''
+def scrape(start_url: str, limit: int, match_url: typing.Union[str, re.Pattern, None], exclude_url: typing.Union[str, re.Pattern, None], delay: typing.Optional[int]) -> typing.List[Form]:
+    queue = []
+    results = []
+    visited = set()
+
+    queue.append((start_url, limit))
+
+    while len(queue) > 0:
+        this_url, depth = queue.pop(0)
+        visited.add(this_url)
+
+        base = this_url.split('/')[0] + '//' + this_url.split('/')[2] + '/'
+
+        if depth == 0:
+            print(f'Warning: Not scanning {this_url} due to limits')
+            continue
+
+        if delay is not None:
+            time.sleep(delay)
+
+        page, err, _ = soupify(this_url)
+
+        results += find_formlike(this_url, match_url, exclude_url)
+        results += find_forms(this_url, match_url, exclude_url)
+
+        for link in page.find_all('a'):
+            next_url = link.get('href')
+
+            if next_url is None:
+                continue
+
+            if re.search(r'^(https?:)?//', next_url):
+                pass
+            elif not next_url.startswith('/'):
+                next_url = this_url + '/' + next_url
+            else:
+                next_url = base + next_url[1:]
+
+            if match_url is not None and not re.search(match_url, next_url):
+                continue
+
+            if exclude_url is not None and re.search(exclude_url, next_url):
+                continue
+
+            if next_url in visited:
+                continue
+
+            queue.append((next_url, depth - 1))
+
+    return results
+
+'''
 Find and return all HTML forms on a page
 '''
-def find_forms(url: str, match_url: typing.Optional[str], exclude_url: typing.Optional[str]) -> typing.List[Form]:
+def find_forms(url: str, match_url: typing.Union[str, re.Pattern, None], exclude_url: typing.Union[str, re.Pattern, None]) -> typing.List[Form]:
     page, err, _ = soupify(url)
 
     if err is not None:
-        raise Exception(f'Could not read page {url}: HTTP error {err}')
+        print(f'Warning: Could not read page {url}: HTTP error {err}')
+
+    base = url.split('/')[0] + '//' + url.split('/')[2] + '/'
 
     forms = []
-    base = url.split('/')[0] + '//' + url.split('/')[2]
 
     for form in page.find_all('form'):
-        if match_url is not None and not re.search(match_url, base + form.get('action')):
+        action = form.get('action')
+
+        if action is None:
+            action = url
+
+        if re.search(r'^(https?:)?//', action):
+            pass
+        elif not action.startswith('/'):
+            action = url + '/' + action
+        else:
+            action = base + action[1:]
+
+        if match_url is not None and not re.search(match_url, action):
             continue
 
-        if exclude_url is not None and re.search(exclude_url, base + form.get('action')):
+        if exclude_url is not None and re.search(exclude_url, action):
             continue
 
-        form_obj = Form(base + form.get('action') if form.get('action')[0] == '/' else form.get('action'), form.get('method', 'GET'))
+        form_obj = Form(action, form.get('method', 'GET'))
 
         for field in form.find_all('input'):
             if field.get('type') not in ['text', 'password', 'search'] or 'name' not in field.attrs:
@@ -75,42 +146,40 @@ def find_forms(url: str, match_url: typing.Optional[str], exclude_url: typing.Op
 '''
 Find all form-like URLs by crawling
 '''
-def find_formlike(url: str, match_url: typing.Optional[str], exclude_url: typing.Optional[str], delay: typing.Optional[int]) -> typing.List[Form]:
-    visited = set()
-    queue = []
+def find_formlike(url: str, match_url: typing.Union[str, re.Pattern, None], exclude_url: typing.Union[str, re.Pattern, None]) -> typing.List[Form]:
+    page, err, _ = soupify(url)
 
-    queue.append(url)
+    if err is not None:
+        print(f'Warning: Could not read page {url}: HTTP error {err}')
+        
+    base = url.split('/')[0] + '//' + url.split('/')[2] + '/'
+    
+    candidates = []
 
-    while len(queue) > 0:
-        this_url = queue.pop()
+    for link in page.find_all('a'):
+        candidate = link.get('href')
 
-        visited.add(this_url)
-        page, err, _ = soupify(this_url)
-
-        if err:
+        if candidate is None:
             continue
+
+        if re.search(r'^(https?:)?//', candidate):
+            pass
+        elif not candidate.startswith('/'):
+            candidate = url + '/' + candidate
+        else:
+            candidate = base + candidate[1:]
         
-        for link in page.find_all('a'):
-            next_url = link.get('href')
+        if match_url is not None and not re.search(match_url, candidate):
+            continue
 
-            if next_url.startswith('/'):
-                next_url = url + next_url[1:]
-            
-            if match_url is not None and not re.search(match_url, next_url):
-                continue
+        if exclude_url is not None and re.search(exclude_url, candidate):
+            continue
 
-            if exclude_url is not None and re.search(exclude_url, next_url):
-                continue
-
-            if next_url is not None and next_url not in visited:
-                queue.append(next_url)
-        
-        if delay is not None:
-            time.sleep(delay)
+        candidates.append(candidate)
     
     form_unique = set()
 
-    for candidate in visited:
+    for candidate in candidates:
         if '?' in candidate:
             candidate = re.sub(r'=[^&]+&', '&', candidate)
             candidate = re.sub(r'=[^&]+', '', candidate)

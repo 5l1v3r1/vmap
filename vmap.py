@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse, sys
+import argparse, json, re, sys
 
 import lfi, sqli, utils
 
@@ -42,6 +42,7 @@ parser.add_argument('--limit', metavar='limit', default=4, type=int, help='gener
 parser.add_argument('--delay', metavar='delay', type=int, help='specify a delay between requests to avoid overloading the server')
 parser.add_argument('--match-url', metavar='pattern', type=str, help='specify a regular expression which URLs must match to be considered for vulnerabilites')
 parser.add_argument('--exclude-url', metavar='pattern', type=str, help='specify a regular expression for which matching URLs are not considered for vulnerabilities')
+parser.add_argument('--report', metavar='file', type=str, help='output all URLs scanned, and their vulnerabilities, to the given JSON file')
 parser.add_argument('target', type=str, help='the target URL')
 
 args = parser.parse_args()
@@ -50,7 +51,21 @@ if args.flag is None and args.login is None and args.inclusion is None:
     print(f'Nothing to do...\nSeek not and ye shall find not\n\nUse the -h flag for help')
     sys.exit(0)
 
-forms = utils.find_forms(args.target, args.match_url, args.exclude_url) + utils.find_formlike(args.target, args.match_url, args.exclude_url, args.delay)
+match_url = args.match_url
+if match_url is not None:
+    try:
+        match_url = re.compile(match_url)
+    except re.error:
+        print('Warning: Match URL is invalid regex, treating as plain text')
+
+exclude_url = args.exclude_url
+if exclude_url is not None:
+    try:
+        exclude_url = re.compile(exclude_url)
+    except re.error:
+        print('Warning: Exclude URL is invalid regex, treating as plain text')
+
+forms = utils.scrape(args.target, args.limit, match_url, exclude_url, args.delay)
 results = []
 
 if args.login is not None:
@@ -72,3 +87,14 @@ if len(results) == 0:
 else:
     for vuln in results:
         print(f'{vuln}\n')
+
+if args.report is not None:
+    report = {}
+    for form in forms:
+        report[form.name] = [v.json() for v in results if v.form == form]
+    
+    try:
+        with open(args.report, 'w') as f:
+            f.write(json.dumps(report))
+    except Error as e:
+        print(f'Could not write report: {e}')
