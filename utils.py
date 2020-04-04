@@ -229,16 +229,21 @@ def find_formlike(url: str, match_url: typing.Union[str, re.Pattern, None], excl
 '''
 Uses various techniques to avoid a blacklist in a given string
 '''
-def bl_avoid(payload: str, blacklist: typing.List[str]) -> typing.List[str]:
+def bl_avoid(payload: str, blacklist: typing.List[str], capitalisation: bool = True) -> typing.List[str]:
+    results = []
+
     # Substring search avoidance
     sa = payload
     for b in blacklist:
         sa = sa.replace(b, b[0] + b + b[1:])
-    
+    results.append(sa)
+
     # Random capitalisation
-    rc = payload
-    for b in blacklist:
-        r = ''.join([random.choice([c.upper(), c.lower()]) for c in list(b)])
-        rc = rc.replace(b, r)
+    if capitalisation:
+        rc = payload
+        for b in blacklist:
+            r = ''.join([random.choice([c.upper(), c.lower()]) for c in list(b)])
+            rc = rc.replace(b, r)
+        results.append(rc)
     
-    return [sa, rc]
+    return results

