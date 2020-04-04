@@ -39,6 +39,7 @@ parser.add_argument('-l', '--login', metavar='cookie', help='test login queries,
 parser.add_argument('-f', '--flag', metavar=('flag', 'column', 'table'), nargs=3, help='test sql flag queries, checking for injecting a particular value, from a particular column, in a particular table')
 parser.add_argument('-i', '--inclusion', metavar=('file', 'flag'), nargs=2, help='test for local file inclusion with the given path, file should contain the given flag')
 parser.add_argument('-s', '--script', action='store_true', help='check for the ability to run user-supplied scripts')
+parser.add_argument('-x', '--xss', metavar=('url', 'text'), nargs=2, help='check for the ability to make cross-origin requests via. user-supplied scripts, should include a URL to request from and some text which appears in a successful response')
 parser.add_argument('--limit', metavar='limit', default=4, type=int, help='generalised limit for how deep searches should be (defaults to 4)')
 parser.add_argument('--delay', metavar='delay', type=int, help='specify a delay between requests to avoid overloading the server')
 parser.add_argument('--match-url', metavar='pattern', type=str, help='specify a regular expression which URLs must match to be considered for vulnerabilites')
@@ -48,7 +49,7 @@ parser.add_argument('target', type=str, help='the target URL')
 
 args = parser.parse_args()
 
-if args.flag is None and args.login is None and args.inclusion is None and args.script is None:
+if args.flag is None and args.login is None and args.inclusion is None and args.script is None and args.xss is None:
     print(f'Nothing to do...\nSeek not and ye shall find not\n\nUse the -h flag for help')
     sys.exit(0)
 
@@ -81,9 +82,13 @@ if args.inclusion is not None:
     print('Checking local file inclusion...')
     results += lfi.test_lfi(forms, args.limit, args.delay, args.inclusion[0], args.inclusion[1])
 
-if args.script is not None:
+if args.script:
     print('Checking script injection...')
     results += xss.test_scripts(forms, args.limit, args.delay)
+
+if args.xss is not None:
+    print('Checking XSS...')
+    results += xss.test_xss(forms, args.limit, args.delay, args.xss[0], args.xss[1])
 
 print('')
 

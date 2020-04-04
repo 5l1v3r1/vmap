@@ -28,15 +28,6 @@ class SQLIVuln():
         return f'\x1B[91mVulnerability detected!\x1B[0m\nOn field {self._field} in {self._form}\nQuery was {self._query}, type {self._qtype}'
 
 '''
-Avoids a blacklist by adding substrings for query words
-'''
-def bl_avoid_substring(query: str) -> str:
-    blacklist = ['select', 'from', 'where', 'union', 'insert', 'update']
-    for word in blacklist:
-        query = query.replace(word, word[0] + word + word[1:])
-    return query
-
-'''
 Generates login-type queries with true or false statements injected
 '''
 def login_queries(limits: int) -> typing.List[str]:
@@ -46,7 +37,7 @@ def login_queries(limits: int) -> typing.List[str]:
 
     for settings in itertools.product(types, range(limits)):
         candidates.append(settings[0].replace('@@', ', null' * settings[1]))
-        candidates.append(bl_avoid_substring(candidates[-1]))
+        candidates.append(utils.bl_avoid(candidates[-1], ['select', 'from', 'where', 'union', 'insert', 'update']))
 
     return candidates
 
@@ -60,7 +51,7 @@ def flag_queries(limits: int, flag_col: str, flag_table: str) -> typing.List[str
 
     for settings in itertools.product(types, range(limits)):
         candidates.append(settings[0].replace('@@', ', null' * settings[1]))
-        candidates.append(bl_avoid_substring(candidates[-1]))
+        candidates.append(utils.bl_avoid(candidates[-1], ['select', 'from', 'where', 'union', 'insert', 'update']))
 
     return candidates
 

@@ -1,4 +1,4 @@
-import bs4, requests, re, time, typing
+import bs4, random, requests, re, time, typing
 
 SoupifyResult = typing.Union[typing.Tuple[None, int, None], typing.Tuple[bs4.BeautifulSoup, None, typing.Optional[str]]]
 SouplessResult = typing.Union[typing.Tuple[None, int], typing.Tuple[str, None]]
@@ -225,3 +225,20 @@ def find_formlike(url: str, match_url: typing.Union[str, re.Pattern, None], excl
         results.append(form)
     
     return results
+
+'''
+Uses various techniques to avoid a blacklist in a given string
+'''
+def bl_avoid(payload: str, blacklist: typing.List[str]) -> typing.List[str]:
+    # Substring search avoidance
+    sa = payload
+    for b in blacklist:
+        sa = sa.replace(b, b[0] + b + b[1:])
+    
+    # Random capitalisation
+    rc = payload
+    for b in blacklist:
+        r = ''.join([random.choice([c.upper(), c.lower()]) for c in list(b)])
+        rc = rc.replace(b, r)
+    
+    return [sa, rc]
