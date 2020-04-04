@@ -1,4 +1,4 @@
-import selenium, selenium.webdriver, selenium.webdriver.support.expected_conditions, time, typing
+import hashlib, selenium, selenium.webdriver, selenium.webdriver.support.expected_conditions, time, typing
 
 import utils
 
@@ -33,18 +33,25 @@ def script_injections(script: str) -> typing.List[str]:
     candidates = []
 
     image = f'<img src=\'fake_url\' onerror=\'{script}\' />'
-    bold = f'<b onload=\'{script}\'>test</b>'
     script = f'<script>{script}</script>'
 
     candidates += [image, bold, script]
     candidates += utils.bl_avoid(image, ['img', 'src', 'onerror', 'http', 'fetch'])
-    candidates += utils.bl_avoid(bold, ['onload', 'http', 'fetch'])
     candidates += utils.bl_avoid(script, ['script', 'http', 'fetch'])
 
     for i in range(len(candidates)):
         candidates[i] = candidates[i].replace('@@index@@', str(i))
 
     return candidates
+
+'''
+Generate an ID-friendly unique ID
+'''
+def generate_id(form: str, field: str, timestamp: int, index: str) -> str:
+    md5 = hashlib.md5()
+    md5.update(form.encode('utf-8', 'ignore'))
+    md5.update(field.encode('utf-8', 'ignore'))
+    return f'vmap.{timestamp}.{md5.hexdigest()}.{index}'
 
 '''
 Tests a list of forms for JS injection vulnerabilities
@@ -55,11 +62,12 @@ def test_scripts(targets: typing.List[utils.Form], limits: int, delay: typing.Op
     driver_opts = selenium.webdriver.ChromeOptions()
     driver_opts.add_argument('headless')
 
-    timestamp = str(time.time())
+    timestamp = int(time.time())
 
     for form in targets:
         for field in form.get_fields():
-            injections = script_injections(f'document.body.innerHTML+="<br id=\\"vmap.{timestamp}.{form}.{field}.@@index@@\\" />";')
+            gid = generate_id(form.name, field, timestamp, '@@index@@')
+            injections = script_injections(f'document.body.innerHTML+="<br id=\\"{gid}\\" />";')
             for i in range(len(injections)):
                 url, err = form.soupless_request({x : (injections[i] if x == field else '') for x in form.get_fields()})
 
@@ -69,12 +77,11 @@ def test_scripts(targets: typing.List[utils.Form], limits: int, delay: typing.Op
                 driver = selenium.webdriver.Chrome(chrome_options=driver_opts)
                 driver.get(url)
                 try:
-                    c = (selenium.webdriver.common.by.By.ID, f'vmap.{timestamp}.{form}.{field}.{i}')
+                    c = (selenium.webdriver.common.by.By.ID, generate_id(form.name, field, timestamp, str(i)))
                     selenium.webdriver.support.ui.WebDriverWait(driver, limits).until(selenium.webdriver.support.expected_conditions.presence_of_element_located(c))
+                    results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
                 except selenium.common.exceptions.TimeoutException:
                     pass
-                finally:
-                    results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
                 driver.close()
                 
                 if delay is not None:
@@ -82,12 +89,6 @@ def test_scripts(targets: typing.List[utils.Form], limits: int, delay: typing.Op
     
     driver.quit()
     return results
-
-# Pick a good public API with no auth which shouldn't be allowed via. the CSP
-# The API returns a JSON dump of a joke with type: 'programming' so should contain 'programming'
-# API thanks to David Katz https://github.com/15Dkatz/official_joke_api
-XSS_API_URL = 'https://official-joke-api.appspot.com/jokes/programming/random'
-XSS_FLAG_TEXT = 'programming'
 
 '''
 Tests a list of forms for XSS vulnerabilities
@@ -102,7 +103,8 @@ def test_xss(targets: typing.List[utils.Form], limits: int, delay: typing.Option
 
     for form in targets:
         for field in form.get_fields():
-            injections = script_injections(f'fetch("{flag_url}").then(res => res.text()).then(text => document.body.innerHTML+="<span id=\\"vmap.{timestamp}.{form}.{field}.@@index@@\\">"+text+"</span>");')
+            gid = generate_id(form.name, field, timestamp, '@@index@@')
+            injections = script_injections(f'fetch("{flag_url}").then(res => res.text()).then(text => document.body.innerHTML+="<span id=\\"{gid}\\">"+text+"</span>");')
             for i in range(len(injections)):
                 url, err = form.soupless_request({x : (injections[i] if x == field else '') for x in form.get_fields()})
 
@@ -112,12 +114,11 @@ def test_xss(targets: typing.List[utils.Form], limits: int, delay: typing.Option
                 driver = selenium.webdriver.Chrome(chrome_options=driver_opts)
                 driver.get(url)
                 try:
-                    c = (selenium.webdriver.common.by.By.ID, f'vmap.{timestamp}.{form}.{field}.{i}')
-                    selenium.webdriver.support.ui.WebDriverWait(driver, limits).until(selenium.webdriver.support.expected_conditions.text_to_be_present_in_element(c, flag_text))
+                    c = (selenium.webdriver.common.by.By.ID, generate_id(form.name, field, timestamp, str(i)))
+                    selenium.webdriver.support.ui.WebDriverWait(driver, limits).until(selenium.webdriver.support.expected_conditions.presence_of_element_located(c))
+                    results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
                 except selenium.common.exceptions.TimeoutException:
                     pass
-                finally:
-                    results.append(XSSVuln(form, field, injections[i], 'JS Injection'))
                 driver.close()
                 
                 if delay is not None:
