@@ -1,0 +1,30 @@
+<!doctype>
+<html>
+	<head>
+		<title>GOAT (Greatest of All Time) E-commerce Solutions</title>
+	</head>
+	<body>
+		<h1>GOAT (Greatest of All Time) E-commerce Solutions</h1>
+		<hr />
+		{% if username == '' %}
+		<h3 style='color: #050;'>Login</h3>
+		<form action='/login' method='POST'>
+			<label for='username'>Username: </label><input type='text' name='username' placeholder='Username' /><br />
+			<label for='password'>Password: </label><input type='password' name='password' placeholder='Password' /><br />
+			<button name='submit' type='submit'>Login</button>
+		</form>
+		{% else %}
+		<h3 style='color: #0c0;'>Welcome {{ username }}</h3>
+		{% endif %}
+		<hr />
+		<h3 style='color: #00c;'>Products</h3>
+		{% for product in products %}
+			<p><b>{{ product[0] }}</b> {{ product[1] }} <i>Price: ${{ product[2] }}</i></p>
+		{% endfor %}
+		<form action='/' method='GET'>
+			<label for='q'>Search: </label><input type='search' name='q' placeholder='Search...' /> <button name='submit' type='submit'>Search</button>
+		</form>
+		<hr />
+		<p>&copy; Nick 2020</p>
+	</body>
+</html>
